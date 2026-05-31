@@ -1,9 +1,12 @@
+from statistics import mean
+
 from agent import Agent
 import math
+import random
 
 
 class Sim:
-    def __init__(self, agents, params):
+    def __init__(self, queue, params):
         """
         Params:
             - move_speed                Movement speed of agents in pixels per frame
@@ -11,124 +14,125 @@ class Sim:
             - wait_time                 Number of frames agents wait at the end point before being removed from the sim
         """
 
-        self.agents = agents
+        self.queue = queue
         self.params = params
-        self.next_id = len(agents) + 1
+        self.next_id = 1
+        self.next_group_id = 1
+
+    @property
+    def agents(self):
+        return [a for _, group in self.queue for a in group]
 
     def spawn(self, x, y):
-        """Spawn a new agent at (x, y) with velocity towards last agent in queue"""
+        num_agents = int(self._expo_sample(1, 8))
+        spread = self.params.get("spawn_spread", 15)
 
-        agent = Agent(self.next_id, f"00:00:00:00:00:{self.next_id:02x}", x, y, 0, 0)
+        group = []
+        for _ in range(num_agents):
+            # Randomly spawn agents around click location
+            ox, oy = random.gauss(0, spread), random.gauss(0, spread)
+            agent = Agent(self.next_id, self.next_group_id, f"00:00:00:00:00:{self.next_id:02x}", x + ox, y + oy, 0, 0)
 
-        # Calculate unit vector towards last agent in queue, or towards end if no agents
-        if self.agents:
-            xu, yu = self._agent_to_agent_vec(agent, self.agents[-1])
-        else:
-            xu, yu = self._agent_to_point_vec(agent, self.params["end_point"])
+            group.append(agent)
+            self.next_id += 1
 
-        # Set velocity along unit vector
-        agent.xv = xu * self.params["desired_speed"]
-        agent.yv = yu * self.params["desired_speed"]
-
-        self.agents.append(agent)
-        self.next_id += 1
+        self.queue.append((self.next_group_id, group))
+        self.next_group_id += 1
 
     def step(self):
         p = self.params
-        v0, tau = p["desired_speed"], p["reaction_time"]
-        A, B, R = p["A"], p["B"], p["influence_radius"]
-        E  = p["end_point"]
-        PT = p["proximity_threshold"]
-        AS = p["alignment_strength"]
+        v0, tau = p["desired_speed"], p["reaction_time"]                                # driving: target speed, reaction time
+        A, B, R = p["A"], p["B"], p["influence_radius"]                                 # repulsion: strength, falloff, cutoff radius
+        E, PT, gap = p["end_point"], p["proximity_threshold"], p["follow_gap"]
 
-        # Reversed centerline unit vector (points from end back toward start —
-        # i.e. the direction "behind the leader" in the queue)
+        # Reversed centerline unit vector: points from the end back toward the start used for following gap
         sx, sy = p["start_point"]
-        ex, ey = E
-        cdx, cdy = sx - ex, sy - ey            # end -> start
+        cdx, cdy = sx - E[0], sy - E[1]                      
         clen = math.hypot(cdx, cdy)
         back_ux, back_uy = (cdx / clen, cdy / clen) if clen else (0.0, 0.0)
-        gap = p["follow_gap"]
 
-        # Check if head of queue has reached end point, and if so, increment checkpoint timer or remove from sim
-        head = self.agents[0] if self.agents else None
-        if head and self._agent_to_point_dist(head, E) < PT:
-            if head.checkpoint_timer < self.params["wait_time"]:
-                head.checkpoint_timer += 1
-
-            else:
-                self.agents.pop(0)
-                print(f"Agent {head.id} reached end point")
-
-        if not self.agents:
+        if not self.queue:
             return
 
-        # Update agent velocities
-        dvx_arr = []
-        dvy_arr = []
-        for i, agent in enumerate(self.agents):
-            # Get coordinates of target (end point for head of queue, prior agent for others)
+        # Process the agent physically nearest the end point in group 0
+        _, front = self.queue[0]
+        if front:
+            head = min(front, key=lambda a: self._agent_to_point_dist(a, E))
+            if self._agent_to_point_dist(head, E) < PT:
+                # Head has arrived, hold it at the servery for wait_time frames
+                if head.checkpoint_timer < p["wait_time"]:
+                    head.checkpoint_timer += 1
+                else:
+                    front.remove(head)
+                    print(f"Agent {head.id} reached end point")
+                    if not front:                 
+                        # group fully served
+                        self.queue.pop(0)
+                    if not self.queue:
+                        return
+                    
+        all_agents = self.agents
+
+        # Compute new velocities for every agent
+        for i, (group_id, group_agents) in enumerate(self.queue):
             if i == 0:
-                target = E
-                if self._agent_to_point_dist(agent, E) < PT:
-                    agent.xv *= 0.5
-                    agent.yv *= 0.5
-                    continue  
+                # Order group 0 by closeness to goal 
+                ordered = sorted(group_agents, key=lambda a: self._agent_to_point_dist(a, E))
             else:
-                prior = self.agents[i - 1]
+                # Group n>0 follows group n-1 mean with a gap
+                _, prior = self.queue[i - 1]
+                mx, my = mean(a.x for a in prior), mean(a.y for a in prior)
+                group_target = (mx + back_ux * gap, my + back_uy * gap)
 
-                # Where agent is trying to go
-                target = (prior.x + back_ux * gap, prior.y + back_uy * gap)
+            # Iterate the group 0 in sorted order
+            seq = ordered if i == 0 else group_agents
+            for k, agent in enumerate(seq):
+              
+                # Calculate agent target point
+                if i == 0:
+                    if k == 0:
+                        # Head of the front group drives straight at the end point.
+                        target = E
+                        # On arrival, brake instead of driving through the point.
+                        if self._agent_to_point_dist(agent, E) < PT:
+                            agent.xv *= 0.5
+                            agent.yv *= 0.5            
+                    else:
+                        # Other front-group members follow the agent ahead of them with a gap
+                        lead = seq[k - 1]
+                        target = (lead.x + back_ux * gap, lead.y + back_uy * gap)
+                else:
+                    # Trailing-group members follow the group ahead
+                    target = group_target
 
-            # Get unit vector towards target
-            xu, yu = self._agent_to_point_vec(agent, target)
+                # --- Driving force: (v0 * ê - v) / tau ---
+                # Steers velocity toward `target` at desired speed v0, damped by current velocity and reaction time tau
+                xu, yu = self._agent_to_point_vec(agent, target)
+                dfx = (v0 * xu - agent.xv) / tau
+                dfy = (v0 * yu - agent.yv) / tau
 
-            # Calculate driving forces
-            driving_force_x = (v0 * xu - agent.xv) / tau
-            driving_force_y = (v0 * yu - agent.yv) / tau
+                # --- Repulsion force: sum of exponential pushes from nearby agents ---
+                # Each neighbor within R contributes A*exp((r_i+r_j - d)/B) along the
+                # unit vector pointing from the neighbor to this agent
+                rfx, rfy = 0.0, 0.0
+                for other in all_agents:
+                    if other is agent:
+                        continue
+                    dist = self._agent_to_agent_dist(agent, other)
+                    if dist < R:
+                        a_exp = math.exp((agent.radius + other.radius - dist) / B)
+                        rfx += A * a_exp * (agent.x - other.x) / dist
+                        rfy += A * a_exp * (agent.y - other.y) / dist
 
-            # Calculate repulsion forces from nearby agents
-            repulsion_force_x, repulsion_force_y = 0, 0
-            sum_neighbor_vx, sum_neighbor_vy = 0, 0
-            n = 0
+                # --- Containment force: gentle pull back toward the centerline ---
+                cfx, cfy = self._containment_force(agent)
 
-            for j, other in enumerate(self.agents):
-                if other is agent:
-                    continue
+                # Combine forces
+                agent.xv += dfx + (rfx + cfx) / agent.mass
+                agent.yv += dfy + (rfy + cfy) / agent.mass
 
-                dist = self._agent_to_agent_dist(agent, other)
-                if dist < R:
-                    # Repulsion force magnitude decreases with distance
-                    A_exp = math.exp((agent.radius + other.radius - dist) / B)
-
-                    repulsion_force_x += A * A_exp * (agent.x - other.x) / dist
-                    repulsion_force_y += A * A_exp * (agent.y - other.y) / dist
-
-                    # Follow neighbors nearby that are in front of agent
-                    if j < i:
-                        sum_neighbor_vx += other.xv
-                        sum_neighbor_vy += other.yv
-                        n += 1
-
-            # Containment force to keep agents in corridor
-            containment_force_x, containment_force_y = self._containment_force(agent)
-
-            # Combine forces
-            dvx = driving_force_x + (repulsion_force_x + containment_force_x) / agent.mass
-            dvy = driving_force_y + (repulsion_force_y + containment_force_y) / agent.mass
-
-            # Add group aligning force to encourage agents to match velocity of neighbors
-            if n > 0:
-                avg_neighbor_vx = sum_neighbor_vx / n
-                avg_neighbor_vy = sum_neighbor_vy / n
-                dvx += AS * (avg_neighbor_vx - agent.xv)
-                dvy += AS * (avg_neighbor_vy - agent.yv)
-
-            agent.xv += dvx
-            agent.yv += dvy
-
-        # Update agent positions
-        for agent in self.agents:
+        # Update positions 
+        for agent in all_agents:
             agent.x += agent.xv
             agent.y += agent.yv
 
@@ -160,6 +164,11 @@ class Sim:
             return (0.0, 0.0)
 
         return (-C * perp_dist * px, -C * perp_dist * py)
+
+    def _expo_sample(self, start, end):
+        """Sample Exponential distribution between start and end, right-skewed towards start"""
+
+        return min(end, start + int(random.expovariate(0.4)))
 
     def _agent_to_agent_dist(self, a, b):
         """Distance from agent a to agent b"""

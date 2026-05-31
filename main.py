@@ -10,18 +10,18 @@ def main():
 
     sim_params = {
         "desired_speed": 0.6,
-        "reaction_time": 0.6,          
-        "influence_radius": 60,     
+        "reaction_time": 0.6,
+        "influence_radius": 80,        
         "proximity_threshold": 20,
-        "A": 1.2,                   
-        "B": 30,                   
-        "containment_strength": 0.0005, 
-        "corridor_width": 250,
-        "alignment_strength": 0.1,
+        "A": 1.2,
+        "B": 40,                       
+        "containment_strength": 0.002, 
+        "corridor_width": 80,         
         "follow_gap": 25,
         "wait_time": 60,
         "start_point": (W / 1.2, H / 1.2),
         "end_point": (W / 10, H / 10),
+        "spawn_spread": 20,
     }
 
     sim = Sim([], sim_params)
