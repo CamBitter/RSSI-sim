@@ -22,6 +22,8 @@ def main():
         "start_point": (W / 1.2, H / 1.2),
         "end_point": (W / 10, H / 10),
         "spawn_spread": 20,
+        "head_drive_multiplier": 2.0,
+        "group_drive_multiplier": 1.5,
     }
 
     sim = Sim([], sim_params)

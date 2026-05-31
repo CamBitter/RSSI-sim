@@ -44,6 +44,7 @@ class Sim:
         v0, tau = p["desired_speed"], p["reaction_time"]                                # driving: target speed, reaction time
         A, B, R = p["A"], p["B"], p["influence_radius"]                                 # repulsion: strength, falloff, cutoff radius
         E, PT, gap = p["end_point"], p["proximity_threshold"], p["follow_gap"]
+        HM, GM = p["head_drive_multiplier"], p["group_drive_multiplier"]                # multipliers for driving force of head of front group and trailing groups
 
         # Reversed centerline unit vector: points from the end back toward the start used for following gap
         sx, sy = p["start_point"]
@@ -104,12 +105,17 @@ class Sim:
                 else:
                     # Trailing-group members follow the group ahead
                     target = group_target
+                    
 
                 # --- Driving force: (v0 * ê - v) / tau ---
                 # Steers velocity toward `target` at desired speed v0, damped by current velocity and reaction time tau
+
+                # Get drive force multiplier based on position in queue
+                drive_mult = HM if (i== 0 and k == 0) else GM
+
                 xu, yu = self._agent_to_point_vec(agent, target)
-                dfx = (v0 * xu - agent.xv) / tau
-                dfy = (v0 * yu - agent.yv) / tau
+                dfx = (v0 * drive_mult * xu - agent.xv) / tau
+                dfy = (v0 * drive_mult * yu - agent.yv) / tau
 
                 # --- Repulsion force: sum of exponential pushes from nearby agents ---
                 # Each neighbor within R contributes A*exp((r_i+r_j - d)/B) along the

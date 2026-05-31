@@ -33,6 +33,8 @@ def setup_ui(W, H, sim):
         ("follow_gap", 0, 100),
         ("wait_time", 0, 600),
         ("spawn_spread", 0, 100),
+        ("head_drive_multiplier", 1.0, 5.0),
+        ("group_drive_multiplier", 1.0, 5.0),
     ]
 
     # Setup Param UI
