@@ -14,36 +14,29 @@ Uses [DearPyGui](https://github.com/hoffstadt/dearpygui) for sim rendering.
 
 Agent movement is a simplified [Social Force Model](https://pedestriandynamics.org/models/social_force_model/). Each frame, every agent accumulates three forces into its velocity, then integrates position.
 
-**Driving force** — steers an agent toward its target at desired speed `v0`, damped by current velocity over reaction time `τ`:
+**Driving force** — steers an agent toward its target at desired speed $v_0$, damped by current velocity over reaction time $\tau$:
 
-```
-F_drive = (v0 · ê − v) / τ
-```
+$$\vec{F}_\text{drive} = \frac{v_0\,\hat{e} - \vec{v}}{\tau}$$
 
-`ê` is the unit vector toward the target. The `−v` term provides built-in damping. A multiplier scales `v0` up for the queue head (clears the servery) and trailing groups.
+$\hat{e}$ is the unit vector toward the target. The $-\vec{v}$ term provides built-in damping. A multiplier scales $v_0$ up for the queue head (clears the servery) and for trailing groups.
 
-**Repulsion force** — agents push apart with an exponential that rises sharply on contact, summed over neighbors within radius `R`:
+**Repulsion force** — agents push apart with an exponential that rises sharply on contact, summed over neighbors within radius $R$:
 
-```
-F_rep = Σ  A · exp((r_i + r_j − d_ij) / B) · n̂_ij
-```
+$$\vec{F}_\text{rep} = \sum_{j} A \, \exp\!\left(\frac{r_i + r_j - d_{ij}}{B}\right) \hat{n}_{ij}$$
 
-`d_ij` is the inter-agent distance, `r_i + r_j` their combined radii, `n̂_ij` the unit vector from neighbor to agent. `A` sets strength, `B` sets falloff range.
+$d_{ij}$ is the inter-agent distance, $r_i + r_j$ their combined radii, $\hat{n}_{ij}$ the unit vector from neighbor to agent. $A$ sets strength, $B$ sets falloff range.
 
-**Containment force** — a soft spring pulling agents back toward the queue centerline, applied only outside a corridor of half-width `w`:
+**Containment force** — a soft spring pulling agents back toward the queue centerline, applied only outside a corridor of half-width $w$:
 
-```
-F_con = −C · d⊥ · p̂     (if |d⊥| > w, else 0)
-```
+$$\vec{F}_\text{con} = \begin{cases} -C \, d_\perp \, \hat{p} & \text{if } |d_\perp| > w \\ 0 & \text{otherwise} \end{cases}$$
 
-`d⊥` is the signed perpendicular distance to the centerline, `p̂` the perpendicular unit vector, `C` the strength.
+$d_\perp$ is the signed perpendicular distance to the centerline, $\hat{p}$ the perpendicular unit vector, $C$ the strength.
 
-**Integration** (per frame, two passes — forces from a frozen snapshot, then move):
+**Integration** — per frame, in two passes (compute forces from a frozen snapshot, then move):
 
-```
-v ← v + F_drive + (F_rep + F_con) / m
-x ← x + v
-```
+$$\vec{v} \leftarrow \vec{v} + \vec{F}_\text{drive} + \frac{\vec{F}_\text{rep} + \vec{F}_\text{con}}{m}$$
+
+$$\vec{x} \leftarrow \vec{x} + \vec{v}$$
 
 ### Targeting
 
