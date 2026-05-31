@@ -11,5 +11,6 @@ class Agent:
         self.y = y
         self.xv = xv
         self.yv = yv
+        self.radius = 14
+        self.mass = 1
         self.checkpoint_timer = 0
-        self.frames_per_checkpoint = 300

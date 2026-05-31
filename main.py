@@ -6,24 +6,34 @@ import dearpygui.dearpygui as dpg
 
 def main():
 
-    W, H = 1280, 800
+    W, H = 1600, 900
 
     sim_params = {
-        "move_speed": 2,
-        "proximity_threshold": 50,
-        "wait_time": 300,
-        "end_point": (W / 2, H / 10),
+        "desired_speed": 0.6,
+        "reaction_time": 0.6,          
+        "influence_radius": 60,     
+        "proximity_threshold": 20,
+        "A": 1.2,                   
+        "B": 30,                   
+        "containment_strength": 0.0005, 
+        "corridor_width": 250,
+        "alignment_strength": 0.1,
+        "follow_gap": 25,
+        "wait_time": 60,
+        "start_point": (W / 1.2, H / 1.2),
+        "end_point": (W / 10, H / 10),
     }
-   
+
     sim = Sim([], sim_params)
     setup_ui(W, H, sim)
 
     while dpg.is_dearpygui_running():
         sim.step()
-        redraw(sim.agents, sim.end)
+        redraw(sim.agents, sim.params["end_point"])
         dpg.render_dearpygui_frame()
 
     dpg.destroy_context()
+
 
 if __name__ == "__main__":
     main()

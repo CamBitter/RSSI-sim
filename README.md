@@ -9,3 +9,7 @@ Uses [DearPyGui](https://github.com/hoffstadt/dearpygui) for sim rendering.
 `uv sync`
 
 `run run main.py`
+
+### Methods
+
+Agent movements are derived from the [Social Force Model](https://pedestriandynamics.org/models/social_force_model/) from Pedestrian Dynamics.
