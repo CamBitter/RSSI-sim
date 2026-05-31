@@ -26,7 +26,7 @@ $$\vec{F}_\text{rep} = \sum_{j} A \, \exp\!\left(\frac{r_i + r_j - d_{ij}}{B}\ri
 
 $d_{ij}$ is the inter-agent distance, $r_i + r_j$ their combined radii, $\hat{n}_{ij}$ the unit vector from neighbor to agent. $A$ sets strength, $B$ sets falloff range.
 
-**Containment force** — a soft spring pulling agents back toward the queue centerline, applied only outside a corridor of half-width $w$:
+**Containment force** — a force pulling agents back towards queue centerline, applied only outside a corridor of half-width $w$:
 
 $$\vec{F}_\text{con} = \begin{cases} -C \, d_\perp \, \hat{p} & \text{if } |d_\perp| > w \\ 0 & \text{otherwise} \end{cases}$$
 
