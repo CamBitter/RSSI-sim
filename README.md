@@ -7,4 +7,5 @@ Uses [DearPyGui](https://github.com/hoffstadt/dearpygui) for sim rendering.
 ### Setup
 
 `uv sync`
+
 `run run main.py`
