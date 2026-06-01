@@ -9,23 +9,21 @@ def main():
     W, H = 1600, 900
 
     sim_params = {
-        "desired_speed": 0.6,
-        "reaction_time": 0.6,
-        "influence_radius": 80,
-        "proximity_threshold": 20,
-        "A": 1.2,
-        "B": 40,
-        "A_wall": 5,
-        "B_wall": 20,
-        "containment_strength": 0.002,
-        "corridor_width": 80,
-        "follow_gap": 25,
-        "wait_time": 60,
-        "start_point": (W / 1.2, H / 1.2),
-        "end_point": (W / 10, H / 10),
-        "spawn_spread": 20,
-        "head_drive_multiplier": 2.0,
-        "group_drive_multiplier": 1.5,
+        "desired_speed": 0.6,               # v0: target cruising speed (px/frame)
+        "reaction_time": 0.6,               # tau: lower = snappier driving (higher starves movement)
+        "influence_radius": 80,             # cutoff distance for agent/wall repulsion (px)
+        "proximity_threshold": 20,          # distance from end point counted as "arrived" (px)
+        "A": 1.2,                           # agent repulsion strength
+        "B": 40,                            # agent repulsion falloff distance (px)
+        "A_wall": 5,                        # wall repulsion strength (stronger than agents)
+        "B_wall": 20,                       # wall repulsion falloff distance (px)
+        "follow_gap": 25,                   # standoff distance behind leader/group (px)
+        "wait_time": 60,                    # frames head waits at servery before removal
+        "head_drive_multiplier": 2.0,       # extra driving force on the queue head
+        "group_drive_multiplier": 1.5,      # extra driving force on trailing-group agents
+        "start_point": (W / 1.2, H / 1.2),  # queue origin (defines centerline + spawn anchor)
+        "end_point": (W / 10, H / 10),      # servery / goal point
+        "spawn_spread": 20,                 # gaussian jitter radius on group spawn (px)
     }
 
     sim = Sim(sim_params)
