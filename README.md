@@ -4,6 +4,8 @@ A pedestrian-dynamics simulator for generating labelled training data that disti
 
 Rendering and interactive control are provided by [Dear PyGui](https://github.com/hoffstadt/dearpygui).
 
+![demo](docs/demo.gif)
+
 ## Setup
 
 ```
