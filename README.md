@@ -30,7 +30,7 @@ Agent motion follows a simplified variant of the [Social Force Model](https://pe
 
 Each agent is steered toward a target point at a desired speed $v_0$, with the term in the current velocity $\vec{v}$ providing intrinsic damping over a characteristic reaction time $\tau$:
 
-$$\vec{F}_\text{drive} = \mu \frac{v_0\,\hat{e} - \vec{v}}{\tau}$$
+$$\vec{F}_\text{drive} = \mu \frac{v_0\hat{e} - \vec{v}}{\tau}$$
 
 Here $\hat{e}$ is the unit vector from the agent to its target and $\mu$ is a role-dependent multiplier: the queue head and trailing-group members receive elevated values ($\mu_\text{head}$, $\mu_\text{group}$) so that the front of the line advances decisively and groups track one another without stalling. Lower $\tau$ yields more responsive acceleration; excessively high $\tau$ attenuates the force and stalls movement.
 
@@ -50,7 +50,7 @@ $$t = \mathrm{clamp}\left(\frac{(\vec{q} - \vec{p}_1) \cdot \vec{d}}{\lVert \vec
 
 with $\vec{p}_1, \vec{p}_2$ the segment endpoints, $\vec{d} = \vec{p}_2 - \vec{p}_1$, and $\vec{q}$ the agent position. The repulsion then acts along $\hat{n} = (\vec{q} - \vec{c}) / \lVert \vec{q} - \vec{c} \rVert$:
 
-$$\vec{F}_\text{wall} = \sum_\text{walls} A_w \exp\left(\frac{r_i - d}{B_w}\right) \hat{n}, \qquad d = \lVert \vec{q} - \vec{c} \rVert$$
+$$\vec{F}_\text{wall} = \sum_\text{walls} A_w \cdot \exp\left(\frac{r_i - d}{B_w}\right) \hat{n}, \qquad d = \lVert \vec{q} - \vec{c} \rVert$$
 
 The force is perpendicular to the wall when the agent lies alongside it, and radial from an endpoint when the agent is beyond the segment's extent. Wall constants ($A_w$, $B_w$) are tuned independently of agent repulsion, typically stronger, so that corridors reliably contain the queue.
 
