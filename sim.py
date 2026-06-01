@@ -6,7 +6,7 @@ import random
 
 
 class Sim:
-    def __init__(self, queue, params):
+    def __init__(self, params):
         """
         Params:
             - move_speed                Movement speed of agents in pixels per frame
@@ -14,10 +14,12 @@ class Sim:
             - wait_time                 Number of frames agents wait at the end point before being removed from the sim
         """
 
-        self.queue = queue
+        self.queue = []
+        self.walls = []
         self.params = params
         self.next_id = 1
         self.next_group_id = 1
+        self.clock = 0
 
     @property
     def agents(self):
@@ -40,15 +42,24 @@ class Sim:
         self.next_group_id += 1
 
     def step(self):
+
+        # Diagnostics
+        self.clock += 1
+        if self.clock % 60 == 1:
+            pass
+
         p = self.params
-        v0, tau = p["desired_speed"], p["reaction_time"]                                # driving: target speed, reaction time
-        A, B, R = p["A"], p["B"], p["influence_radius"]                                 # repulsion: strength, falloff, cutoff radius
+        v0, tau = p["desired_speed"], p["reaction_time"]  # driving: target speed, reaction time
+        A, B, R = p["A"], p["B"], p["influence_radius"]  # repulsion: strength, falloff, cutoff radius
         E, PT, gap = p["end_point"], p["proximity_threshold"], p["follow_gap"]
-        HM, GM = p["head_drive_multiplier"], p["group_drive_multiplier"]                # multipliers for driving force of head of front group and trailing groups
+        HM, GM = (
+            p["head_drive_multiplier"],
+            p["group_drive_multiplier"],
+        )  # multipliers for driving force of head of front group and trailing groups
 
         # Reversed centerline unit vector: points from the end back toward the start used for following gap
         sx, sy = p["start_point"]
-        cdx, cdy = sx - E[0], sy - E[1]                      
+        cdx, cdy = sx - E[0], sy - E[1]
         clen = math.hypot(cdx, cdy)
         back_ux, back_uy = (cdx / clen, cdy / clen) if clen else (0.0, 0.0)
 
@@ -66,18 +77,18 @@ class Sim:
                 else:
                     front.remove(head)
                     print(f"Agent {head.id} reached end point")
-                    if not front:                 
+                    if not front:
                         # group fully served
                         self.queue.pop(0)
                     if not self.queue:
                         return
-                    
+
         all_agents = self.agents
 
         # Compute new velocities for every agent
         for i, (group_id, group_agents) in enumerate(self.queue):
             if i == 0:
-                # Order group 0 by closeness to goal 
+                # Order group 0 by closeness to goal
                 ordered = sorted(group_agents, key=lambda a: self._agent_to_point_dist(a, E))
             else:
                 # Group n>0 follows group n-1 mean with a gap
@@ -88,7 +99,6 @@ class Sim:
             # Iterate the group 0 in sorted order
             seq = ordered if i == 0 else group_agents
             for k, agent in enumerate(seq):
-              
                 # Calculate agent target point
                 if i == 0:
                     if k == 0:
@@ -97,7 +107,7 @@ class Sim:
                         # On arrival, brake instead of driving through the point.
                         if self._agent_to_point_dist(agent, E) < PT:
                             agent.xv *= 0.5
-                            agent.yv *= 0.5            
+                            agent.yv *= 0.5
                     else:
                         # Other front-group members follow the agent ahead of them with a gap
                         lead = seq[k - 1]
@@ -105,13 +115,12 @@ class Sim:
                 else:
                     # Trailing-group members follow the group ahead
                     target = group_target
-                    
 
                 # --- Driving force: (v0 * ê - v) / tau ---
                 # Steers velocity toward `target` at desired speed v0, damped by current velocity and reaction time tau
 
                 # Get drive force multiplier based on position in queue
-                drive_mult = HM if (i== 0 and k == 0) else GM
+                drive_mult = HM if (i == 0 and k == 0) else GM
 
                 xu, yu = self._agent_to_point_vec(agent, target)
                 dfx = (v0 * drive_mult * xu - agent.xv) / tau
@@ -130,46 +139,46 @@ class Sim:
                         rfx += A * a_exp * (agent.x - other.x) / dist
                         rfy += A * a_exp * (agent.y - other.y) / dist
 
-                # --- Containment force: gentle pull back toward the centerline ---
-                cfx, cfy = self._containment_force(agent)
+                # --- Wall repulsion force ---
+                wfx, wfy = self._wall_force(agent)
 
                 # Combine forces
-                agent.xv += dfx + (rfx + cfx) / agent.mass
-                agent.yv += dfy + (rfy + cfy) / agent.mass
+                agent.xv += wfx + dfx + (rfx / agent.mass)
+                agent.yv += wfy +dfy + (rfy / agent.mass)
 
-        # Update positions 
+        # Update positions
         for agent in all_agents:
             agent.x += agent.xv
             agent.y += agent.yv
 
-    def _containment_force(self, a):
-        """Calculate a force that pushes agent a back towards the center line between start and end points, with strength proportional to the perpendicular distance from the line scaled by containment_strength parameter"""
+    def _wall_force(self, agent):
+        """Calculate repulsion force on agent from walls"""
 
-        sx, sy = self.params["start_point"]
-        ex, ey = self.params["end_point"]
+        p = self.params 
+        Aw, Bw, R = p["A_wall"], p["B_wall"], p["influence_radius"]
+        fx, fy = 0.0, 0.0
 
-        dx, dy = ex - sx, ey - sy
-        length = math.hypot(dx, dy)
-        if length == 0:
-            return (0, 0)
+        for (x1, y1), (x2, y2) in self.walls:
+            # Get closest wall segment point by projecting agent position onto wall segment
+            dx, dy = x2 - x1, y2 - y1
+            seg_len_squared = dx * dx + dy * dy
+            if seg_len_squared == 0:
+                closest_x, closest_y = x1, y1
+            else:
+                t = ((agent.x - x1) * dx + (agent.y - y1) * dy) / seg_len_squared
+                t = max(0, min(1, t))  # Clamp to segment
+                closest_x, closest_y = x1 + t * dx, y1 + t * dy
 
-        # Unit vector from start to end
-        ux, uy = dx / length, dy / length
+            # Get repulsion force from closest point acting on agent
+            ox, oy = agent.x - closest_x, agent.y - closest_y
+            dist = math.hypot(ox, oy)
 
-        # Perpendicular unit vec
-        px, py = -uy, ux
+            if 0 < dist < R:
+                magnitude = Aw * math.exp((agent.radius - dist) / Bw)
+                fx += magnitude * (ox / dist)
+                fy += magnitude * (oy / dist)
 
-        # Signed perpendicular distance from agent to center line
-        wx, wy = a.x - sx, a.y - sy
-        perp_dist = wx * px + wy * py
-
-        C = self.params["containment_strength"]
-        corridor_width = self.params["corridor_width"]
-
-        if abs(perp_dist) < corridor_width:
-            return (0.0, 0.0)
-
-        return (-C * perp_dist * px, -C * perp_dist * py)
+        return fx, fy
 
     def _expo_sample(self, start, end):
         """Sample Exponential distribution between start and end, right-skewed towards start"""
@@ -199,3 +208,9 @@ class Sim:
         if dist == 0:
             return (0, 0)
         return (x - a.x) / dist, (y - a.y) / dist
+    
+    def clear_walls(self):
+        self.walls = []
+
+    def clear_queue(self):
+        self.queue = []

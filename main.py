@@ -11,12 +11,14 @@ def main():
     sim_params = {
         "desired_speed": 0.6,
         "reaction_time": 0.6,
-        "influence_radius": 80,        
+        "influence_radius": 80,
         "proximity_threshold": 20,
         "A": 1.2,
-        "B": 40,                       
-        "containment_strength": 0.002, 
-        "corridor_width": 80,         
+        "B": 40,
+        "A_wall": 5,
+        "B_wall": 20,
+        "containment_strength": 0.002,
+        "corridor_width": 80,
         "follow_gap": 25,
         "wait_time": 60,
         "start_point": (W / 1.2, H / 1.2),
@@ -26,12 +28,12 @@ def main():
         "group_drive_multiplier": 1.5,
     }
 
-    sim = Sim([], sim_params)
+    sim = Sim(sim_params)
     setup_ui(W, H, sim)
 
     while dpg.is_dearpygui_running():
         sim.step()
-        redraw(sim.agents, sim.params["end_point"])
+        redraw(sim.agents, sim.walls)
         dpg.render_dearpygui_frame()
 
     dpg.destroy_context()
